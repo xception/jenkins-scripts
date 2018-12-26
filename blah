@@ -1,0 +1,123 @@
+@Library('ops-jenkins')
+import com.walmart.labs.search.devops.jenkins.utils.Logger
+import groovy.json.JsonSlurper
+
+def logger = new Logger(this)
+def workflowJson = '''
+{
+    "jobName": "USGM/extract",
+	"properties" : "properties/extract/extract.json",
+    "template": "templates/searchExtract.groovy",
+    "Child": [
+        {
+            "jobName": "USGM/xml",
+			"properties" : "properties/xmlgen/example.json",
+            "template": "templates/xmlGeneration.groovy",
+            "Child": [
+                {
+                    "jobName": "USGM/POLARIS/BULKLOAD_usgm_polaris_metadata1",
+				    "properties" : "properties/bulkload/bulkload1.json",
+                    "template": "templates/bulkloader.groovy"
+                }, {
+                    "jobName": "USGM/POLARIS/BULKLOAD_usgm_polaris_metadata2",
+                    "properties" : "properties/bulkload/bulkload2.json",
+                    "template": "templates/bulkloader.groovy"
+                }, {
+                    "jobName": "USGM/POLARIS/BULKLOAD_usgm_polaris_metadata3",
+                    "properties" : "properties/bulkload/bulkload3.json",
+                    "template": "templates/bulkloader.groovy"
+                }, {
+                    "jobName": "USGM/SOLR/FULLINDEX_usgm_solr_wfproda_cdc",
+                    "properties" : "properties/deploy/wfproda_cdc.json",
+                    "template": "templates/wallflower.groovy"
+                }, {
+                    "jobName": "USGM/SOLR/FULLINDEX_usgm_solr_wfproda_dfw",
+                    "properties" : "properties/deploy/wfproda_dfw.json",
+                    "template": "templates/wallflower.groovy"
+                }
+            ]
+        },{
+            "jobName": "USGM/SOLR/ORCHESTRATOR_usgm_solr_proda",
+			"properties" : "properties/orchestrator/usgm-solr-proda.json",
+            "template": "templates/orchestrator.groovy",
+            "Child": [
+                [
+                    {
+                        "jobName": 8,
+                        "properties" : "example8.json",
+                        "template": "H"
+                    }, {
+                        "jobName": 9,
+                        "properties" : "example9.json",
+                        "template": "I"
+                    }                
+                ],
+                [
+                    {
+                        "jobName": 10,
+                        "properties" : "example10.json",
+                        "template": "J"
+                    }, {
+                        "jobName": 11,
+                        "properties" : "example11.json",
+                        "template": "K"
+                    }                
+                ],
+                {
+                    "jobName": 12,
+				    "properties" : "example12.json",
+                    "template": "L"
+                }, {
+                    "jobName": 13,
+				    "properties" : "example13.json",
+                    "template": "M"
+                }
+            ]
+        }
+    ]
+}
+'''.trim()
+
+logger.info("class of workflowJson = ${workflowJson.class}")
+def x = jsonMap( workflowJson )
+assert x instanceof Map//println x
+
+def jsonMap(def jsonStr){
+    def jsonMap = readJSON text: jsonStr
+    return jsonMap
+}
+
+out = new StringBuffer()
+pad = 1
+def tree(def jsonObj){
+    if(jsonObj instanceof String) {
+        jsonObj = jsonMap(jsonObj)
+    }
+    //println("Current JSON Object : \n${jsonObj}") 
+    
+    for (current in jsonObj) {
+       
+        if (current.key == "Child"){
+            pad += 1
+            //println out
+            if(current.value instanceof List) {
+                for( each in current.value){
+                    tree(each)
+                    println "Current padding multiplier : ${pad}"
+                    //pad = pad - 1
+                }
+            } else {
+                tree(current.value)
+            }
+            tree(current.value)
+        }
+        if (current.key == "jobName"){
+            out << ("\t" * pad) + current + "\n\n" 
+        } else {
+            //out << ("\t" * pad) +current + "\n"
+        }
+    }
+}
+
+tree(x)
+println out
